@@ -24,22 +24,6 @@ temperature = 0
 verbose = False # for debug
 default_youtube_video_file = 'ironman2023/srt_files/SULAWESI _ Makassar & Malino _ Indonesia Travel VLOG 1 - YouTube - English.srt'
 
-llm_chat = None
-memory = None
-
-def init_env():
-    """
-    初始所有的環境設定
-
-    """
-    global llm_chat, memory
-
-    # 這裏是我們的大腦
-    llm_chat = ChatOpenAI(temperature=0)
-
-    # memory 就像是我們的記憶
-    memory = ConversationBufferMemory(return_messages=True, input_key="input")  # 預設 memory_key 為 history
-
 
 def load_document_from_srt_file(srt_file):
     loader = SRTLoader(srt_file)
@@ -48,7 +32,6 @@ def load_document_from_srt_file(srt_file):
     content_lines = document_loaded[0].page_content.splitlines()
 
     return content_lines
-
 
 
 #================================================================================================
@@ -90,8 +73,6 @@ def get_topic_extractor_chain():
 
     return chain
 
-topic_extractor_chain = get_topic_extractor_chain()
-
 
 ######################################
 # 「從學習主題生成例句」的提示設計
@@ -122,9 +103,6 @@ def get_sample_sentence_generation_chain():
     return chain
 
 
-sentence_generation_chain = get_sample_sentence_generation_chain()
-
-
 ######################################
 # 「搜尋學習主題影片」的提示設計
 ######################################
@@ -137,12 +115,6 @@ def search_video_from_sample_sentence_func(inputs: dict) -> dict:
             "video_source": docs_searched[0].metadata["source"]
             }
 
-topic_video_search_chain = TransformChain(
-    input_variables=["sample_sentence"],
-    output_variables=["similar_sentence", "video_source"],
-    transform=search_video_from_sample_sentence_func
-)
-
 
 ######################################
 # 「讀取學習主題影片」提示設計
@@ -152,12 +124,6 @@ def load_document_from_video_source(inputs: dict) -> dict:
 
     document_loaded = load_document_from_srt_file(video_source_full)
     return {"document_loaded": document_loaded}
-
-document_loader_from_video_source_chain = TransformChain(
-    input_variables=["video_source"],
-    output_variables=["document_loaded"],
-    transform=load_document_from_video_source
-)
 
 
 ######################################
@@ -195,43 +161,6 @@ def get_learning_mode_guide_chain():
 
     return chain
 
-learning_mode_guide_chain = get_learning_mode_guide_chain()
-
-
-######################################
-# 「從學習主題讀取文件」的集成執行鏈提示設計
-######################################
-topic_document_loading_overall_chain = SequentialChain(
-    chains=[
-        topic_extractor_chain,
-        sentence_generation_chain,
-        topic_video_search_chain,
-        document_loader_from_video_source_chain,
-        learning_mode_guide_chain
-    ],
-    input_variables=[
-        # topic_extractor_chain 需要的變數
-        'input',
-        # learning_mode_guide_chain 需要的變數
-        "user_lang",
-        "learning_lang",
-    ],
-    # Here we return multiple variables
-    output_variables=[
-        # topic_extractor_chain 的輸出
-        "learning_topic",
-        # sentence_generation_chain 的輸出
-        "sample_sentence",
-        # topic_video_search_chain 的輸出
-        "similar_sentence",
-        "video_source",
-        # document_loader_from_video_source_chain 的輸出
-        "document_loaded",
-        # learning_mode_guide_chain 的輸出
-        "text",
-    ],
-    verbose=verbose)
-
 
 ######################################
 # 「YouTube 網址提取器」的提示設計
@@ -264,8 +193,6 @@ def get_youtube_url_extractor_chain():
     chain = LLMChain(llm=llm_chat, prompt=chat_prompt_extractor, verbose=verbose, output_key='youtube_url')
 
     return chain
-
-youtube_url_extractor_chain = get_youtube_url_extractor_chain()
 
 
 ######################################
@@ -318,8 +245,6 @@ def get_video_guide_chain():
 
     return chain
 
-video_guide_chain = get_video_guide_chain()
-
 
 def process_youtube_url_extract_result(inputs: dict) -> dict:
     """
@@ -350,40 +275,6 @@ def process_youtube_url_extract_result(inputs: dict) -> dict:
             "document_loaded": None,
             "text": video_guide_response['text']
         }
-
-youtube_url_process_chain = TransformChain(
-    input_variables=["youtube_url", "video_guide_responser", "learning_mode_responser"],
-    output_variables=["document_loaded", "text"],
-    transform=process_youtube_url_extract_result
-)
-
-
-######################################
-# Youtube URL 文件讀取的集成執行鏈」提示設計
-######################################
-youtube_url_document_loading_overall_chain = SequentialChain(
-    chains=[
-        youtube_url_extractor_chain,
-        youtube_url_process_chain
-    ],
-    input_variables=[
-        # youtube_url_extractor_chain 需要的變數
-        'input',
-        # youtube_url_process_chain 需要的變數
-        "user_lang",
-        "learning_lang",
-        "video_guide_responser",
-        'learning_mode_responser'
-    ],
-    # Here we return multiple variables
-    output_variables=[
-        # youtube_url_extractor_chain 的輸出
-        "youtube_url",
-        # youtube_url_process_chain 的輸出
-        "document_loaded",
-        "text",
-    ],
-    verbose=verbose)
 
 
 ######################################
@@ -416,8 +307,6 @@ def get_vidoe_guide_router_chain():
     router_chain = LLMRouterChain.from_llm(llm_chat, router_prompt)
 
     return router_chain
-
-video_guide_router_chain = get_vidoe_guide_router_chain()
 
 
 ######################################
@@ -500,8 +389,6 @@ def get_video_digest_chain():
 
     return chain
 
-video_digest_chain = get_video_digest_chain()
-
 
 def get_digest_teaching_chain():
     template="""你是一個專業的外語老師也是一個說故事高手。我會提供給你一個影片的簡易摘要，
@@ -528,18 +415,6 @@ def get_digest_teaching_chain():
                      verbose=verbose)
 
     return chain
-
-digest_teaching_chain = get_digest_teaching_chain()
-
-
-from langchain.chains import SequentialChain
-
-digest_teaching_overall_chain = SequentialChain(
-    chains=[video_digest_chain, digest_teaching_chain],
-    input_variables=["learning_lang", "user_lang", "video_content", "input"],
-    # Here we return multiple variables
-    output_variables=["video_digest", "text"],
-    verbose=verbose)
 
 
 ######################################
@@ -569,16 +444,9 @@ def random_sentence_selection_func(inputs: dict) -> dict:
         "selected_captions": recommend_lines
     }
 
-sentence_random_selection_chain = TransformChain(
-    input_variables=[],
-    output_variables=["selected_captions"],
-    transform=random_sentence_selection_func
-)
-
-
-output_parser_lex_learning = CommaSeparatedListOutputParser()
 
 def get_lex_selection_chain():
+    output_parser_lex_learning = CommaSeparatedListOutputParser()
     template="""你是一個專業的外語老師，你有一個特殊專長是在能夠以影片的內容找出值得教學的內容，你也很擅長做課程的規劃。
 
     接下來我會提供給挑選出來的教學例句，請在所有教學例句裏面隨機找出 5 個左右值得拿來做教學的詞彙。
@@ -604,8 +472,6 @@ def get_lex_selection_chain():
 
     return chain
 
-lex_selection_chain = get_lex_selection_chain()
-
 
 # lex teaching chain design
 def get_lex_teaching_chain():
@@ -629,19 +495,6 @@ def get_lex_teaching_chain():
                      verbose=verbose)
 
     return chain
-
-lex_teaching_chain = get_lex_teaching_chain()
-
-
-from langchain.chains import SequentialChain
-
-lex_teaching_overall_chain = SequentialChain(
-    chains=[sentence_random_selection_chain, lex_selection_chain, lex_teaching_chain],
-    input_variables=["learning_lang", "video_content", "input"],
-    # Here we return multiple variables
-    output_variables=["selected_captions", "selected_lexicons", "text"],
-    verbose=verbose)
-
 
 
 ######################################
@@ -674,8 +527,6 @@ def get_caption_random_pick_chain():
 
     return chain
 
-caption_random_pick_chain = get_caption_random_pick_chain()
-
 
 def get_caption_translate_chain():
     template="""你是一個專業的翻譯，你的工作是將下面例句做翻譯：
@@ -701,8 +552,6 @@ def get_caption_translate_chain():
 
     return chain
 
-translate_caption_chain = get_caption_translate_chain()
-
 
 def get_gramma_intro_chain():
     template="""你是一個教材編輯，我會提供給你一個教學例句，請你針對它裏面用到的文法以及單字做介紹。
@@ -727,8 +576,6 @@ def get_gramma_intro_chain():
                      verbose=verbose)
 
     return chain
-
-gramma_intro_chain = get_gramma_intro_chain()
 
 
 def get_gramma_teaching_chain():
@@ -765,17 +612,6 @@ def get_gramma_teaching_chain():
 
     return chain
 
-gramma_teaching_chain = get_gramma_teaching_chain()
-
-
-gramma_teaching_overall_chain = SequentialChain(
-    chains=[caption_random_pick_chain, translate_caption_chain, gramma_intro_chain, gramma_teaching_chain],
-    input_variables=["user_lang", "learning_lang", "video_content", "input"],
-    # Here we return multiple variables
-    output_variables=["random_pick_caption", "translated_caption", "gramma_intro", "text"],
-    #output_variables=["video_source"],
-    verbose=verbose)
-
 
 ######################################
 # 延伸學習提示設計
@@ -811,8 +647,6 @@ def get_related_lex_recommend_chain():
 
     return chain
 
-related_lex_chain = get_related_lex_recommend_chain()
-
 
 def get_learning_mode_guide_chain():
     template = """我們是一個透過 youtube影片內容來學習語言的線上學習系統，我們已經透過使用者的訊息選擇了接下來的學習影片，請你接下來引導使用者選擇他想要的學習方式。
@@ -845,8 +679,6 @@ def get_learning_mode_guide_chain():
     chain = LLMChain(llm=llm_chat, prompt=chat_prompt_template, memory=memory, verbose=verbose)
 
     return chain
-
-learning_mode_guide_chain = get_learning_mode_guide_chain()
 
 
 ######################################
@@ -890,8 +722,6 @@ def get_learning_mode_router_chain():
 
 
     return router_chain
-
-learning_mode_router_chain = get_learning_mode_router_chain()
 
 
 ######################################
@@ -943,3 +773,234 @@ def leanring_mode_phase_handler(user_lang, learning_lang, user_input: str) -> st
         })
 
     return ai_response["text"]
+
+
+# 這裏是我們的大腦
+llm_chat = None
+
+# memory 就像是我們的記憶
+memory = None
+
+# guide chains
+video_guide_chain = None
+learning_mode_guide_chain = None
+
+# 從學習主題讀取文件」的任務執行鏈
+topic_extractor_chain = None
+sentence_generation_chain = None
+topic_video_search_chain = None
+document_loader_from_video_source_chain = None
+learning_mode_guide_chain = None
+topic_document_loading_overall_chain = None
+
+# 「從 Youtube 網址讀取文件」的任務執行鏈
+youtube_url_extractor_chain = None
+youtube_url_process_chain = None
+youtube_url_document_loading_overall_chain = None
+
+# 摘要學習
+video_digest_chain = None
+digest_teaching_chain = None
+digest_teaching_overall_chain = None
+
+# 單字學習
+sentence_random_selection_chain = None
+lex_selection_chain = None
+lex_teaching_chain = None
+lex_teaching_overall_chain = None
+
+# 精彩例句的文法解析
+caption_random_pick_chain = None
+translate_caption_chain = None
+gramma_intro_chain = None
+gramma_teaching_chain = None
+ramma_teaching_overall_chain = None
+
+# 延伸學習
+related_lex_chain = None
+
+# router chains
+video_guide_router_chain = None
+learning_mode_router_chain = None
+
+
+def init_chatbot():
+    global llm_chat, memory
+    global video_guide_chain, learning_mode_guide_chain
+
+    # 從學習主題讀取文件」的任務執行鏈
+    global topic_extractor_chain, sentence_generation_chain, topic_video_search_chain
+    global document_loader_from_video_source_chain
+    global topic_document_loading_overall_chain
+
+    # 「從 Youtube 網址讀取文件」的任務執行鏈
+    global youtube_url_extractor_chain, youtube_url_process_chain
+    global youtube_url_document_loading_overall_chain
+    
+
+    # 摘要學習
+    global video_digest_chain, digest_teaching_chain
+    global digest_teaching_overall_chain
+
+    # 單字學習
+    global sentence_random_selection_chain, lex_selection_chain, lex_teaching_chain
+    global lex_teaching_overall_chain
+
+    # 精彩例句的文法解析
+    global caption_random_pick_chain, translate_caption_chain
+    global gramma_intro_chain, gramma_teaching_chain
+    global gramma_teaching_overall_chain
+
+    # 延伸學習
+    global related_lex_chain
+
+    # router chains
+    global video_guide_router_chain
+    global learning_mode_router_chain
+
+
+    llm_chat = ChatOpenAI(temperature=0)
+    memory = ConversationBufferMemory(return_messages=True, input_key="input")  # 預設 memory_key 為 history
+
+   
+    # guide chains
+    video_guide_chain = get_video_guide_chain()
+    learning_mode_guide_chain = get_learning_mode_guide_chain()
+
+    ######################################
+    # 從學習主題讀取文件」的任務執行鏈
+    ######################################
+    topic_extractor_chain = get_topic_extractor_chain()
+    sentence_generation_chain = get_sample_sentence_generation_chain()
+    topic_video_search_chain = TransformChain(
+        input_variables=["sample_sentence"],
+        output_variables=["similar_sentence", "video_source"],
+        transform=search_video_from_sample_sentence_func
+    )
+    document_loader_from_video_source_chain = TransformChain(
+        input_variables=["video_source"],
+        output_variables=["document_loaded"],
+        transform=load_document_from_video_source
+    )
+
+    # 「從學習主題讀取文件」的集成執行鏈提示設計
+    topic_document_loading_overall_chain = SequentialChain(
+        chains=[
+            topic_extractor_chain,
+            sentence_generation_chain,
+            topic_video_search_chain,
+            document_loader_from_video_source_chain,
+            learning_mode_guide_chain
+        ],
+        input_variables=[
+            # topic_extractor_chain 需要的變數
+            'input',
+            # learning_mode_guide_chain 需要的變數
+            "user_lang",
+            "learning_lang",
+        ],
+        # Here we return multiple variables
+        output_variables=[
+            # topic_extractor_chain 的輸出
+            "learning_topic",
+            # sentence_generation_chain 的輸出
+            "sample_sentence",
+            # topic_video_search_chain 的輸出
+            "similar_sentence",
+            "video_source",
+            # document_loader_from_video_source_chain 的輸出
+            "document_loaded",
+            # learning_mode_guide_chain 的輸出
+            "text",
+        ],
+        verbose=verbose)
+    
+    ######################################
+    # 「從 Youtube 網址讀取文件」的任務執行鏈
+    ######################################
+    youtube_url_extractor_chain = get_youtube_url_extractor_chain()
+    youtube_url_process_chain = TransformChain(
+        input_variables=["youtube_url", "video_guide_responser", "learning_mode_responser"],
+        output_variables=["document_loaded", "text"],
+        transform=process_youtube_url_extract_result
+    )
+
+    # Youtube URL 文件讀取的集成執行鏈」提示設計
+    youtube_url_document_loading_overall_chain = SequentialChain(
+        chains=[
+            youtube_url_extractor_chain,
+            youtube_url_process_chain
+        ],
+        input_variables=[
+            # youtube_url_extractor_chain 需要的變數
+            'input',
+            # youtube_url_process_chain 需要的變數
+            "user_lang",
+            "learning_lang",
+            "video_guide_responser",
+            'learning_mode_responser'
+        ],
+        # Here we return multiple variables
+        output_variables=[
+            # youtube_url_extractor_chain 的輸出
+            "youtube_url",
+            # youtube_url_process_chain 的輸出
+            "document_loaded",
+            "text",
+        ],
+        verbose=verbose)
+
+    video_guide_router_chain = get_vidoe_guide_router_chain()
+
+    
+    ######################################
+    # 摘要學習
+    ######################################
+    video_digest_chain = get_video_digest_chain()
+    digest_teaching_chain = get_digest_teaching_chain()
+
+    digest_teaching_overall_chain = SequentialChain(
+        chains=[video_digest_chain, digest_teaching_chain],
+        input_variables=["learning_lang", "user_lang", "video_content", "input"],
+        # Here we return multiple variables
+        output_variables=["video_digest", "text"],
+        verbose=verbose)
+    
+    ######################################
+    # 單字學習
+    ######################################
+    sentence_random_selection_chain = TransformChain(
+        input_variables=[],
+        output_variables=["selected_captions"],
+        transform=random_sentence_selection_func
+    )
+    lex_selection_chain = get_lex_selection_chain()
+    lex_teaching_chain = get_lex_teaching_chain()
+    lex_teaching_overall_chain = SequentialChain(
+        chains=[sentence_random_selection_chain, lex_selection_chain, lex_teaching_chain],
+        input_variables=["learning_lang", "video_content", "input"],
+        # Here we return multiple variables
+        output_variables=["selected_captions", "selected_lexicons", "text"],
+        verbose=verbose)
+    
+    ######################################
+    # 精彩例句的文法解析
+    ######################################
+    caption_random_pick_chain = get_caption_random_pick_chain()
+    translate_caption_chain = get_caption_translate_chain()
+    gramma_intro_chain = get_gramma_intro_chain()
+    gramma_teaching_chain = get_gramma_teaching_chain()
+    gramma_teaching_overall_chain = SequentialChain(
+        chains=[caption_random_pick_chain, translate_caption_chain, gramma_intro_chain, gramma_teaching_chain],
+        input_variables=["user_lang", "learning_lang", "video_content", "input"],
+        # Here we return multiple variables
+        output_variables=["random_pick_caption", "translated_caption", "gramma_intro", "text"],
+        #output_variables=["video_source"],
+        verbose=verbose)
+
+    ######################################
+    # 延伸學習
+    ######################################
+    related_lex_chain = get_related_lex_recommend_chain()
+
+    learning_mode_router_chain = get_learning_mode_router_chain()
