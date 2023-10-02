@@ -16,13 +16,15 @@ from langchain.document_loaders import SRTLoader
 from langchain.memory import ConversationBufferMemory
 from langchain.output_parsers import CommaSeparatedListOutputParser
 from langchain.schema.vectorstore import VectorStore
+from langchain.docstore.document import Document
 import re
 
 
 model_name = 'gpt-3.5-turbo-16k'
 temperature = 0
 verbose = False # for debug
-default_youtube_video_file = 'ironman2023/srt_files/SULAWESI _ Makassar & Malino _ Indonesia Travel VLOG 1 - YouTube - English.srt'
+_default_youtube_video_file = None
+_data_root = None
 
 
 def load_document_from_srt_file(srt_file):
@@ -120,7 +122,10 @@ def search_video_from_sample_sentence_func(inputs: dict) -> dict:
 # 「讀取學習主題影片」提示設計
 ######################################
 def load_document_from_video_source(inputs: dict) -> dict:
-    video_source_full = 'ironman2023/' + inputs["video_source"]
+    if _data_root:
+        video_source_full = f"{_data_root}/{inputs['video_source']}"
+    else:
+        video_source_full = inputs["video_source"]
 
     document_loaded = load_document_from_srt_file(video_source_full)
     return {"document_loaded": document_loaded}
@@ -259,7 +264,7 @@ def process_youtube_url_extract_result(inputs: dict) -> dict:
 
 
     if is_valid_youtube_url(youtube_url):
-        loaded_document = load_document_from_srt_file(default_youtube_video_file)
+        loaded_document = load_document_from_srt_file(_default_youtube_video_file)
 
         print(f'calling {learning_mode_responser}')
         inputs['video_source'] = youtube_url
@@ -312,9 +317,7 @@ def get_vidoe_guide_router_chain():
 ######################################
 # 取得學習影片階段的 routering handling 函式
 ######################################
-def video_guide_phase_handler(user_lang: str, learning_lang: str, db_vector: VectorStore, user_input: str) -> str:
-    global learning_document
-
+def video_guide_phase_handler(user_lang: str, learning_lang: str, db_vector: VectorStore, user_input: str) -> dict:
     # 訊息的路由判斷
     router_result = video_guide_router_chain(user_input)
 
@@ -322,6 +325,7 @@ def video_guide_phase_handler(user_lang: str, learning_lang: str, db_vector: Vec
         print(f'router_result: {router_result}')
 
     ai_response = None
+    document_loaded = None
     if router_result['destination'] == 'Topic extractor':
         if verbose:
             print(f'從指定主題載入學習文件')
@@ -334,10 +338,10 @@ def video_guide_phase_handler(user_lang: str, learning_lang: str, db_vector: Vec
             "input": user_input
         })
 
-        learning_document = ai_response['document_loaded']
+        document_loaded = ai_response['document_loaded']
 
         if verbose:
-            print('learning_document:', learning_document)
+            print('document_loaded:', document_loaded)
     elif router_result['destination'] == 'YoutubeURL extractor':
         if verbose:
             print(f'從預設的 srt 檔案載入學習文件')
@@ -350,10 +354,10 @@ def video_guide_phase_handler(user_lang: str, learning_lang: str, db_vector: Vec
             'learning_mode_responser': learning_mode_guide_chain,
         })
 
-        learning_document = ai_response['document_loaded']
+        document_loaded = ai_response['document_loaded']
 
         if verbose:
-            print('learning_document:', learning_document)
+            print('document_loaded:', document_loaded)
     else:
         # 預設處理流程
         ai_response = video_guide_chain({
@@ -362,7 +366,10 @@ def video_guide_phase_handler(user_lang: str, learning_lang: str, db_vector: Vec
             'input': user_input,
         })
 
-    return ai_response["text"]
+    return {
+        "text": ai_response["text"],
+        "document_loaded": document_loaded
+    }
 
 
 #================================================================================================
@@ -727,7 +734,7 @@ def get_learning_mode_router_chain():
 ######################################
 # 學習模式下的 routering handling
 ######################################
-def leanring_mode_phase_handler(user_lang, learning_lang, user_input: str) -> str:
+def learning_mode_phase_handler(user_lang: str, learning_lang: str, learning_document: Document, user_input: str) -> dict:
     global chatting_mode
 
     # chat mode handler
@@ -768,11 +775,13 @@ def leanring_mode_phase_handler(user_lang, learning_lang, user_input: str) -> st
         ai_response = learning_mode_guide_chain({
             'user_lang': user_lang,
             'learning_lang': learning_lang,
-            'video_source': default_youtube_video_file,
+            'video_source': _default_youtube_video_file,
             'input': user_input
         })
 
-    return ai_response["text"]
+    return {
+        "text": ai_response["text"]
+    }
 
 
 # 這裏是我們的大腦
@@ -824,7 +833,10 @@ video_guide_router_chain = None
 learning_mode_router_chain = None
 
 
-def init_chatbot():
+def init_chatbot(data_root: str=None):
+    global _data_root
+    global _default_youtube_video_file
+
     global llm_chat, memory
     global video_guide_chain, learning_mode_guide_chain
 
@@ -858,6 +870,12 @@ def init_chatbot():
     global video_guide_router_chain
     global learning_mode_router_chain
 
+    _data_root = data_root
+
+    if _data_root:
+        _default_youtube_video_file = f"{_data_root}/srt_files/SULAWESI _ Makassar & Malino _ Indonesia Travel VLOG 1 - YouTube - English.srt"
+    else:
+        _default_youtube_video_file = "srt_files/SULAWESI _ Makassar & Malino _ Indonesia Travel VLOG 1 - YouTube - English.srt"
 
     llm_chat = ChatOpenAI(temperature=0)
     memory = ConversationBufferMemory(return_messages=True, input_key="input")  # 預設 memory_key 為 history
