@@ -59,7 +59,7 @@ def load_document_from_srt_file(srt_file):
 ######################################
 # 「取得學習主題」的提示設計
 ######################################
-def get_topic_extractor_chain(verbose=False):
+def get_topic_extractor_chain():
     """
     這裏是取得語言學習情景的任務器
     """
@@ -90,7 +90,7 @@ def get_topic_extractor_chain(verbose=False):
 
     return chain
 
-topic_extractor_chain = get_topic_extractor_chain(llm_chat, verbose=False)
+topic_extractor_chain = get_topic_extractor_chain(llm_chat)
 
 
 ######################################
