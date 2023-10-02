@@ -15,6 +15,7 @@ from langchain.chains.router.multi_prompt_prompt import MULTI_PROMPT_ROUTER_TEMP
 from langchain.document_loaders import SRTLoader
 from langchain.memory import ConversationBufferMemory
 from langchain.output_parsers import CommaSeparatedListOutputParser
+from langchain.schema.vectorstore import VectorStore
 import re
 
 
@@ -422,7 +423,7 @@ video_guide_router_chain = get_vidoe_guide_router_chain()
 ######################################
 # 取得學習影片階段的 routering handling 函式
 ######################################
-def video_guide_phase_handler(user_lang: str, learning_lang: str, user_input: str) -> str:
+def video_guide_phase_handler(user_lang: str, learning_lang: str, db_vector: VectorStore, user_input: str) -> str:
     global learning_document
 
     # 訊息的路由判斷
@@ -440,6 +441,7 @@ def video_guide_phase_handler(user_lang: str, learning_lang: str, user_input: st
         ai_response = topic_document_loading_overall_chain({
             "learning_lang": learning_lang,
             "user_lang": user_lang,
+            'db_vector': db_vector,
             "input": user_input
         })
 
