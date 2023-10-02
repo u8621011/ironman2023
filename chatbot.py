@@ -90,13 +90,13 @@ def get_topic_extractor_chain():
 
     return chain
 
-topic_extractor_chain = get_topic_extractor_chain(llm_chat)
+topic_extractor_chain = get_topic_extractor_chain()
 
 
 ######################################
 # 「從學習主題生成例句」的提示設計
 ######################################
-def get_sample_sentence_generation_chain(llm):
+def get_sample_sentence_generation_chain():
     tempalte = """你是一個例句生成器，你的任務是根據使用者提供給你的語言使用情景，生成以下條件的的常用例句。
 
     生成條件
@@ -115,14 +115,14 @@ def get_sample_sentence_generation_chain(llm):
     chat_prompt_template = ChatPromptTemplate.from_messages([system_message_prompt, human_message_prompt])
 
     chain = LLMChain(
-        llm=llm,
+        llm=llm_chat,
         prompt=chat_prompt_template,
         output_key="sample_sentence")
 
     return chain
 
 
-sentence_generation_chain = get_sample_sentence_generation_chain(llm_chat)
+sentence_generation_chain = get_sample_sentence_generation_chain()
 
 
 ######################################
