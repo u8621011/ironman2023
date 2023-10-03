@@ -20,9 +20,9 @@ from langchain.docstore.document import Document
 import re
 
 
-model_name = 'gpt-3.5-turbo-16k'
-temperature = 0
-verbose = False # for debug
+_model_name = 'gpt-3.5-turbo-16k'
+_temperature = 0
+_verbose = False # for debug
 _default_youtube_video_file = None
 _data_root = None
 
@@ -71,7 +71,7 @@ def get_topic_extractor_chain():
         HumanMessagePromptTemplate.from_template('{input}')
     ])
 
-    chain = LLMChain(llm=llm_chat, prompt=chat_prompt_topic_extractor, verbose=verbose, output_key='learning_topic')
+    chain = LLMChain(llm=llm_chat, prompt=chat_prompt_topic_extractor, verbose=_verbose, output_key='learning_topic')
 
     return chain
 
@@ -100,7 +100,8 @@ def get_sample_sentence_generation_chain():
     chain = LLMChain(
         llm=llm_chat,
         prompt=chat_prompt_template,
-        output_key="sample_sentence")
+        output_key="sample_sentence",
+        verbose=_verbose)
 
     return chain
 
@@ -112,6 +113,10 @@ def search_video_from_sample_sentence_func(inputs: dict) -> dict:
     sample_sentence = inputs["sample_sentence"]
     db_vector = inputs["db_vector"]
     docs_searched = db_vector.similarity_search(sample_sentence)
+
+    if _verbose:
+        video_source = docs_searched[0].metadata["source"]
+        print(f"video_source: {video_source}")
 
     return {"similar_sentence": docs_searched[0].page_content,
             "video_source": docs_searched[0].metadata["source"]
@@ -162,7 +167,7 @@ def get_learning_mode_guide_chain():
         HumanMessagePromptTemplate.from_template('{input}')
     ])
 
-    chain = LLMChain(llm=llm_chat, prompt=chat_prompt_template, memory=memory, verbose=verbose)
+    chain = LLMChain(llm=llm_chat, prompt=chat_prompt_template, memory=memory, verbose=_verbose)
 
     return chain
 
@@ -195,7 +200,7 @@ def get_youtube_url_extractor_chain():
         human_message_prompt
     ])
 
-    chain = LLMChain(llm=llm_chat, prompt=chat_prompt_extractor, verbose=verbose, output_key='youtube_url')
+    chain = LLMChain(llm=llm_chat, prompt=chat_prompt_extractor, verbose=_verbose, output_key='youtube_url')
 
     return chain
 
@@ -246,7 +251,7 @@ def get_video_guide_chain():
     ])
 
 
-    chain = LLMChain(llm=llm_chat, prompt=chat_prompt_default, memory=memory, verbose=verbose, output_key="text")
+    chain = LLMChain(llm=llm_chat, prompt=chat_prompt_default, memory=memory, verbose=_verbose, output_key="text")
 
     return chain
 
@@ -321,13 +326,13 @@ def video_guide_phase_handler(user_lang: str, learning_lang: str, db_vector: Vec
     # 訊息的路由判斷
     router_result = video_guide_router_chain(user_input)
 
-    if verbose:
+    if _verbose:
         print(f'router_result: {router_result}')
 
     ai_response = None
     document_loaded = None
     if router_result['destination'] == 'Topic extractor':
-        if verbose:
+        if _verbose:
             print(f'從指定主題載入學習文件')
 
         # 根據學習主題載入文件
@@ -340,10 +345,12 @@ def video_guide_phase_handler(user_lang: str, learning_lang: str, db_vector: Vec
 
         document_loaded = ai_response['document_loaded']
 
-        if verbose:
-            print('document_loaded:', document_loaded)
+        if _verbose:
+            print(f'document_loaded: {document_loaded}')
+            print(f'similar_sentence: {ai_response["similar_sentence"]}')
+            print(f'sample_sentence: {ai_response["sample_sentence"]}')
     elif router_result['destination'] == 'YoutubeURL extractor':
-        if verbose:
+        if _verbose:
             print(f'從預設的 srt 檔案載入學習文件')
 
         ai_response = youtube_url_document_loading_overall_chain({
@@ -356,7 +363,7 @@ def video_guide_phase_handler(user_lang: str, learning_lang: str, db_vector: Vec
 
         document_loaded = ai_response['document_loaded']
 
-        if verbose:
+        if _verbose:
             print('document_loaded:', document_loaded)
     else:
         # 預設處理流程
@@ -392,7 +399,7 @@ def get_video_digest_chain():
     chain = LLMChain(llm=llm_chat,
                      prompt=chat_prompt,
                      output_key="video_digest",
-                     verbose=verbose)
+                     verbose=_verbose)
 
     return chain
 
@@ -419,7 +426,7 @@ def get_digest_teaching_chain():
 
     chain = LLMChain(llm=llm_chat,
                      prompt=chat_prompt,
-                     verbose=verbose)
+                     verbose=_verbose)
 
     return chain
 
@@ -475,7 +482,7 @@ def get_lex_selection_chain():
     chain = LLMChain(llm=llm_chat,
                      prompt=chat_prompt,
                      output_key='selected_lexicons',
-                     verbose=verbose)
+                     verbose=_verbose)
 
     return chain
 
@@ -499,7 +506,7 @@ def get_lex_teaching_chain():
 
     chain = LLMChain(llm=llm_chat,
                      prompt=chat_prompt,
-                     verbose=verbose)
+                     verbose=_verbose)
 
     return chain
 
@@ -530,7 +537,7 @@ def get_caption_random_pick_chain():
                      prompt=chat_prompt,
                      output_key='random_pick_caption',
                      #output_parser=output_parser_selected_caption,
-                     verbose=verbose)
+                     verbose=_verbose)
 
     return chain
 
@@ -555,7 +562,7 @@ def get_caption_translate_chain():
     chain = LLMChain(llm=llm_chat,
                      prompt=chat_prompt,
                      output_key='translated_caption',
-                     verbose=verbose)
+                     verbose=_verbose)
 
     return chain
 
@@ -580,7 +587,7 @@ def get_gramma_intro_chain():
     chain = LLMChain(llm=llm_chat,
                      prompt=chat_prompt,
                      output_key='gramma_intro',
-                     verbose=verbose)
+                     verbose=_verbose)
 
     return chain
 
@@ -615,7 +622,7 @@ def get_gramma_teaching_chain():
 
     chain = LLMChain(llm=llm_chat,
                      prompt=chat_prompt,
-                     verbose=verbose)
+                     verbose=_verbose)
 
     return chain
 
@@ -650,7 +657,7 @@ def get_related_lex_recommend_chain():
 
     chain = LLMChain(llm=llm_chat,
                      prompt=chat_prompt,
-                     verbose=verbose)
+                     verbose=_verbose)
 
     return chain
 
@@ -683,7 +690,7 @@ def get_learning_mode_guide_chain():
         HumanMessagePromptTemplate.from_template('{input}')
     ])
 
-    chain = LLMChain(llm=llm_chat, prompt=chat_prompt_template, memory=memory, verbose=verbose)
+    chain = LLMChain(llm=llm_chat, prompt=chat_prompt_template, memory=memory, verbose=_verbose)
 
     return chain
 
@@ -740,7 +747,7 @@ def learning_mode_phase_handler(user_lang: str, learning_lang: str, learning_doc
     # chat mode handler
     router_result = learning_mode_router_chain(user_input)
 
-    if verbose:
+    if _verbose:
         print(f'router_result: {router_result}')
 
     ai_response = None
@@ -833,7 +840,8 @@ video_guide_router_chain = None
 learning_mode_router_chain = None
 
 
-def init_chatbot(data_root: str=None):
+def init_chatbot(data_root: str=None, verbose: bool=False):
+    global _verbose
     global _data_root
     global _default_youtube_video_file
 
@@ -870,6 +878,7 @@ def init_chatbot(data_root: str=None):
     global video_guide_router_chain
     global learning_mode_router_chain
 
+    _verbose = verbose
     _data_root = data_root
 
     if _data_root:
@@ -877,7 +886,7 @@ def init_chatbot(data_root: str=None):
     else:
         _default_youtube_video_file = "srt_files/SULAWESI _ Makassar & Malino _ Indonesia Travel VLOG 1 - YouTube - English.srt"
 
-    llm_chat = ChatOpenAI(temperature=0)
+    llm_chat = ChatOpenAI(model_name=_model_name, temperature=_temperature)
     memory = ConversationBufferMemory(return_messages=True, input_key="input")  # 預設 memory_key 為 history
 
    
@@ -931,7 +940,7 @@ def init_chatbot(data_root: str=None):
             # learning_mode_guide_chain 的輸出
             "text",
         ],
-        verbose=verbose)
+        verbose=_verbose)
     
     ######################################
     # 「從 Youtube 網址讀取文件」的任務執行鏈
@@ -966,7 +975,7 @@ def init_chatbot(data_root: str=None):
             "document_loaded",
             "text",
         ],
-        verbose=verbose)
+        verbose=_verbose)
 
     video_guide_router_chain = get_vidoe_guide_router_chain()
 
@@ -982,7 +991,7 @@ def init_chatbot(data_root: str=None):
         input_variables=["learning_lang", "user_lang", "video_content", "input"],
         # Here we return multiple variables
         output_variables=["video_digest", "text"],
-        verbose=verbose)
+        verbose=_verbose)
     
     ######################################
     # 單字學習
@@ -999,7 +1008,7 @@ def init_chatbot(data_root: str=None):
         input_variables=["learning_lang", "video_content", "input"],
         # Here we return multiple variables
         output_variables=["selected_captions", "selected_lexicons", "text"],
-        verbose=verbose)
+        verbose=_verbose)
     
     ######################################
     # 精彩例句的文法解析
@@ -1014,7 +1023,7 @@ def init_chatbot(data_root: str=None):
         # Here we return multiple variables
         output_variables=["random_pick_caption", "translated_caption", "gramma_intro", "text"],
         #output_variables=["video_source"],
-        verbose=verbose)
+        verbose=_verbose)
 
     ######################################
     # 延伸學習
